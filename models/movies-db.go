@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 )
 
@@ -78,14 +79,18 @@ func (m *DBModel) Get(id int) (*Movie, error) {
 }
 
 // すべてのmovieかerrorを返すメソッド(DBModelのポインタレシーバ)
-func (m *DBModel) All() ([]*Movie, error) {
+func (m *DBModel) All(genre ...int) ([]*Movie, error) {
 	// 3sでタイムアウトする
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	query := `select id, title, description, year, release_date, runtime, rating, mpaa_rating,
-							created_at, updated_at from movies order by title
-	`
+	where := ""
+	if len(genre) > 0 {
+		where = fmt.Sprintf("where id in (select movie_id from movies_genres where genre_id = %d)", genre[0])
+	}
+
+	query := fmt.Sprintf(`select id, title, description, year, release_date, runtime, rating, mpaa_rating,
+							created_at, updated_at from movies %s order by title`, where)
 
 	rows, err := m.DB.QueryContext(ctx, query)
 	if err != nil {
@@ -147,4 +152,102 @@ func (m *DBModel) All() ([]*Movie, error) {
 
 
 	return movies, nil
+}
+
+func(m *DBModel) GenresAll() ([]*Genre, error) {
+		// 3sでタイムアウトする
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		query := `select id, genre_name, created_at, updated_at from genres order by genre_name`
+
+		rows, err := m.DB.QueryContext(ctx, query)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+
+		var genres []*Genre
+
+		for rows.Next() {
+			var g Genre
+			err := rows.Scan(
+				&g.ID,
+				&g.GenreName,
+				&g.CreatedAt,
+				&g.UpdatedAt,
+			)
+			if err != nil {
+				return nil, err
+			}
+			genres = append(genres, &g)
+		}
+
+		return genres, nil
+}
+
+func (m *DBModel) InsertMovie(movie Movie) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	stmt := `insert into movies (title, description, year, release_date, runtime, rating, mpaa_rating, created_at, updated_at) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
+
+	_, err := m.DB.ExecContext(ctx, stmt,
+		movie.Title,
+		movie.Description,
+		movie.Year,
+		movie.ReleaseDate,
+		movie.Runtime,
+		movie.Rating,
+		movie.MPAARating,
+		movie.CreatedAt,
+		movie.UpdatedAt,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *DBModel) UpdateMovie(movie Movie) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	stmt := `update movies set title = $1, description = $2, year = $3, release_date = $4, 
+						runtime = $5, rating = $6, mpaa_rating = $7, 
+						updated_at = $8 where id = $9`
+
+	_, err := m.DB.ExecContext(ctx, stmt,
+		movie.Title,
+		movie.Description,
+		movie.Year,
+		movie.ReleaseDate,
+		movie.Runtime,
+		movie.Rating,
+		movie.MPAARating,
+		movie.UpdatedAt,
+		movie.ID,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *DBModel) DeleteMovie(id int) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	stmt := "delete from movies where id = $1"
+
+	_, err := m.DB.ExecContext(ctx, stmt, id)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
