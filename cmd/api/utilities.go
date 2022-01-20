@@ -29,10 +29,10 @@ func (app *application) writeJSON(w http.ResponseWriter, status int, data interf
 }
 
 func (app *application) errorJSON(w http.ResponseWriter, err error, status ...int) {
-	statusCode := http.StatusBadRequest
-	if len(status) > 0 {
-		statusCode = status[0]
-	}
+	// statusCode := http.StatusBadRequest
+	// if len(status) > 0 {
+	// 	statusCode = status[0]
+	// }
 
 	type jsonError struct {
 		Message string `json:"message"`
